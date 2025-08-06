@@ -1,29 +1,29 @@
+
 # 🏧 ATM System Design with Database Integration (RFID + PIN Auth)
 
 ## 🔒 Objective
-The primary goal of this project is to develop a **secure ATM system** using **RFID-based authentication** and **PIN verification**, with a PC-side simulated banking backend. The backend is implemented in **C language** using **data structures and file I/O**, and communicates with an LPC2148 microcontroller over **UART**.
+The main aim of this project is to develop a secure ATM system using RFID authentication and a PIN-based interface, with backend banking database integration implemented in C using data structures.
 
 ---
 
-## 🧩 System Overview
+## 🧩 Project Overview
 
-### 🖥️ Backend (PC Side - Linux)
-- Developed in **C using GCC**
-- Acts as a **simulated banking database**
-- Stores and processes:
-  - User details (`users.txt`)
-  - Transactions (`transactions.txt`)
-- Handles communication with the MCU via **UART**
-- Responds to various commands like balance inquiry, withdrawals, PIN change, etc.
+### Front-End (Microcontroller - LPC2148 Side)
+Acts like a real ATM interface:
 
-### 📟 Front-End (Microcontroller - LPC2148)
-- Embedded C code developed using **Keil uVision IDE**
-- Interacts with:
-  - **RFID Reader** (for card detection)
-  - **4x4 Keypad** (for PIN and transaction inputs)
-  - **16x2 LCD Display** (for UI)
-  - **Buzzer** (alerts and feedback)
-  - Communicates with PC via **UART0**
+- **RFID card reader** to identify user
+- **Keypad** for PIN entry and transaction inputs
+- **LCD display** for menu and status messages
+- Communicates with backend PC via **UART**
+- Handles ATM interface components
+
+### Back-End (PC - Linux Side Application in C)
+Simulates a banking system:
+
+- Stores user and transaction data using **struct** and **file I/O**
+- Receives commands via **UART** from MCU
+- Sends results and balance info back to MCU
+- Simulates banking database using data structures
 
 ---
 
@@ -31,82 +31,148 @@ The primary goal of this project is to develop a **secure ATM system** using **R
 
 | Component | Purpose |
 |----------|---------|
-| **LPC2148** | Core microcontroller |
-| **RFID Reader & Tags** | Card-based user authentication |
-| **16x2 LCD Display** | Menu & feedback display |
-| **4x4 Keypad** | PIN/amount input |
-| **MAX232** | RS-232 level shifting |
-| **USB-to-UART/DB9 Cable** | PC ↔ MCU UART Communication |
-| **Buzzer** | User alerts |
+| LPC2148 Microcontroller | Core MCU |
+| RFID Reader & Cards | User authentication |
+| 16x2 LCD Display | Display for UI |
+| 4x4 Matrix Keypad | For PIN/amount input |
+| MAX232 | UART level shifting |
+| Buzzer | Alerts/notifications |
+| USB-to-UART Converter / DB9 Cable | MCU ↔ PC Communication |
 
 ---
 
 ## 🛠️ Software Requirements
 
-| Software | Use |
-|---------|-----|
-| **Keil uVision** | Embedded C development |
-| **Flash Magic** | Program flashing to MCU |
-| **GCC Compiler (Linux)** | Compiling PC-side application |
-| **GTKTerm / Minicom** | Optional: Debug UART |
-| **Any Text Editor** | For .txt database files |
+- **Embedded C**: For microcontroller code
+- **Keil uVision IDE**: Development environment for MCU code
+- **Flash Magic**: Flashing program to MCU
+- **GCC Compiler**: Compiling PC-side C application
 
 ---
 
-## 🧠 Functional Workflow
+## 🧠 Microcontroller Side Implementation
 
-### 1. System Initialization
-- MCU boots, initializes LCD, UART, keypad, and RFID reader
-- Sends a test packet to PC: `#X:LINEOK$`
+### Hardware Interface Modules
 
-### 2. Card Authentication
-- Waits for card scan → sends RFID data: `#C:<CARD_ID>$`
-- PC validates card → responds:
-  - `@OK:ACTIVE:<Name>$`
-  - `@ERR:BLOCK$` or `@ERR:INVALID$`
+- `lcd.c`, `lcd.h`: LCD control
+- `delay.c`, `delay.h`: Timing functions
+- `uart.c`, `uart.h`: UART communication (UART0 & UART1)
+- `keypad.c`, `keypad.h`: Keypad input
 
-### 3. PIN Verification
-- Accepts 4-digit PIN → sends: `#V:<CARD_ID>:<PIN>$`
-- PC replies: `@OK:MATCHED$` or `@ERR:WRONG$`
-- Blocks card after 3 failed attempts
+### Testing Individual Modules
 
-### 4. Main Menu Options
-- `1. Balance Inquiry`
-- `2. Deposit`
-- `3. Withdraw`
-- `4. Mini Statement`
-- `5. PIN Change`
-- `6. Exit ATM`
+- LCD Test: Display characters and strings
+- Keypad Test: Read and display input values
+- UART Test: Send/receive test strings using UART0 and UART1
+- RFID Test: Read card data via UART1 and display on LCD
 
-### 5. Transaction Handling
-- Commands like:
-  - `#A:BAL:<CARD_ID>$` → `@OK:BAL=<Amount>$`
-  - `#A:DEP:<CARD_ID>:<Amount>$` → `@OK:DONE$`
-  - `#A:WTD:<CARD_ID>:<Amount>$` → `@OK:DONE$` or errors
-  - `#A:MST:<CARD_ID>:<TxNo>$` → Mini-statement details
-  - `#A:PIN:<CARD_ID>:<NewPIN>$` → PIN change
+### Main Program Flow
 
-### 6. Exit
-- User selects Exit or timeout occurs → `#Q:SAVE$` sent to PC
+- **Initialization**: Initialize peripherals, display title
+- **RFID Authentication**: Read 10-byte frame → Extract 8-byte ID → Send to PC: `#CARD:12345678$`
+- **PIN Verification**: Wait for PC validation → On success, prompt PIN entry → Send: `#CARD:12345678#PIN:4321$`
+- **Main Menu Options**:
+  - BALANCE
+  - DEPOSIT
+  - WITHDRAW
+  - PIN CHANGE
+  - MINI STATEMENT
+  - EXIT
+- Implement 30-second timeout using interrupts
 
 ---
 
-## 📡 UART Communication Protocol
+## 💻 PC-Side Backend Implementation (Linux, C)
 
-| Type | Format (MCU → PC) | PC Response |
-|------|------------------|-------------|
-| Card Auth | `#C:<RFID>$` | `@OK:ACTIVE:<Name>$` / `@ERR:BLOCK$` / `@ERR:INVALID$` |
-| PIN Verify | `#V:<RFID>:<PIN>$` | `@OK:MATCHED$` / `@ERR:WRONG$` |
-| Withdraw | `#A:WTD:<RFID>:<Amount>$` | `@OK:DONE$` / `@ERR:LOWBAL$` |
-| Deposit | `#A:DEP:<RFID>:<Amount>$` | `@OK:DONE$` |
-| Balance | `#A:BAL:<RFID>$` | `@OK:BAL=<Amount>$` |
-| Mini Statement | `#A:MST:<RFID>:<TxNo>$` | `@TXN:<Type>:<Date>:<Amt>$` |
-| PIN Change | `#A:PIN:<RFID>:<NewPIN>$` | `@OK:DONE$` |
-| Block Card | `#A:BLK:<RFID>$` | `@OK:DONE$` |
-| Connection Check | `#X:LINEOK$` | `@X:LINEOK$` |
+### Flow:
+
+1. Load users and transactions from text files
+2. Initialize UART
+3. Handle commands from MCU and send responses:
+   - Validate RFID & PIN
+   - Balance inquiry, deposit, withdrawal
+   - PIN change and mini-statement
+4. Update files after each transaction
 
 ---
 
-## 🧾 File Descriptions
+## 🔄 ATM Communication Protocol
+
+| # | Type | MCU → PC | PC Response | Description |
+|--|------|-----------|--------------|-------------|
+| 1 | Card Verification | `#C:<RFID>$` | `@OK:ACTIVE:<Name>$`, `@ERR:BLOCK$`, `@ERR:INVALID$` | Card status |
+| 2 | PIN Verification | `#V:<RFID>:<PIN>$` | `@OK:MATCHED$`, `@ERR:WRONG$` | PIN match |
+| 3 | Withdraw | `#A:WTD:<RFID>:<Amount>$` | `@OK:DONE$`, `@ERR:LOWBAL$` | Withdraw money |
+| 4 | Deposit | `#A:DEP:<RFID>:<Amount>$` | `@OK:DONE$` | Deposit money |
+| 5 | Balance Inquiry | `#A:BAL:<RFID>$` | `@OK:BAL=<Amount>$` | Show balance |
+| 6 | Mini Statement | `#A:MST:<RFID>:<TxNo>$` | `@TXN:<Type>:<Date>:<Amount>$`, `@TXN:7$` | Last transactions |
+| 7 | PIN Change | `#A:PIN:<RFID>:<NewPIN>$` | `@OK:DONE$` | PIN update |
+| 8 | Card Block | `#A:BLK:<RFID>$` | `@OK:DONE$` | Block card |
+| 9 | Line Check | `#X:LINEOK$` | `@X:LINEOK$` | Keep alive |
+| 10 | End Session | `#Q:SAVE$` | (None) | Logout |
+
+---
+
+## 🔄 ATM System Working Flow
+
+1. **Initialization**: Peripheral setup → Welcome message → Send keep-alive
+2. **Card Scan**: RFID → Send to PC → Display validation response
+3. **PIN Entry**: 3 tries max → Block on failure
+4. **Menu Navigation**: Use keypad (A/B scroll, 1-6 select)
+5. **Transaction Handling**: Balance, deposit, withdraw, mini-statement, PIN change
+6. **Session Termination**: Manual exit or timeout
+
+---
+
+## 📌 MCU Hardware Connections
+
+### LCD 16x2 ↔ LPC2148
+
+| LCD Pin | LPC2148 Pin | Description |
+|---------|--------------|-------------|
+| D0-D7 | P1.16 - P1.23 | Data lines |
+| RS | P0.16 | Register Select |
+| RW | P0.17 | Read/Write |
+| EN | P0.26 | Enable |
+| VCC | 5V | Power |
+| GND | GND | Ground |
+
+### Keypad ↔ LPC2148
+
+| Line | Pin | |
+|------|-----|--|
+| R0-R3 | P1.24 - P1.27 | Rows |
+| C0-C3 | P1.28 - P1.31 | Columns |
+
+### RFID ↔ LPC2148
+
+| RFID Pin | LPC2148 Pin |
+|----------|--------------|
+| TX | P0.9 (UART1 RX) |
+| VCC | 5V |
+| GND | GND |
+
+### PC ↔ LPC2148 (UART0 via MAX232)
+
+| DB9 Pin | LPC2148 Pin |
+|---------|--------------|
+| RX (Pin 2) | P0.0 (TX) |
+| TX (Pin 3) | P0.1 (RX) |
+
+---
+
+## 🔐 Security & Error Handling
+
+- Card Blocking: 3 failed attempts → Blocked
+- Timeout: 30-second inactivity = logout
+- Frame-based protocol: Commands use `#` and `$` framing
+- File locking: Prevents data corruption
+
+---
+
+## 🙋‍♂️ Author
+
+**Aryan Raj Varma**  
+
 
 
